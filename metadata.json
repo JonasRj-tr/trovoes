@@ -1,0 +1,6 @@
+{
+  "name": "TROVOES",
+  "description": "Sistema de Gestão Completo para Time de Futebol de Base",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

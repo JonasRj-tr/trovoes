@@ -1,0 +1,25 @@
+{
+  "entities": {
+    "users": {
+      "title": "Users",
+      "description": "User profiles and roles",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" }
+      }
+    },
+    "players": {
+      "title": "Players",
+      "description": "Athlete enrollment records",
+      "type": "object",
+      "properties": {
+        "fullName": { "type": "string" },
+        "category": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "short_name": "TROVOES",
+  "name": "TROVOES - Gestão de Futebol de Base",
+  "icons": [
+    {
+      "src": "https://i.imgur.com/BQI5VnK.jpeg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "https://i.imgur.com/BQI5VnK.jpeg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0A111E",
+  "theme_color": "#0A111E",
+  "display": "standalone",
+  "orientation": "portrait"
+}
