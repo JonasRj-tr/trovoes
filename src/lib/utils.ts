@@ -111,3 +111,51 @@ export function printReport(title: string, htmlContent: string) {
   `);
   printWindow.document.close();
 }
+
+/**
+ * Compresses and resizes image file to lightweight Base64 string
+ * to prevent Firestore document size limit errors (1MB max per doc).
+ */
+export function compressImage(file: File, maxWidth = 750, quality = 0.55): Promise<string> {
+  return new Promise((resolve) => {
+    if (!file || !file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string || '');
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL('image/jpeg', quality);
+          resolve(compressed);
+        } else {
+          resolve(event.target?.result as string || '');
+        }
+      };
+      img.onerror = () => resolve(event.target?.result as string || '');
+      img.src = event.target?.result as string;
+    };
+    reader.onerror = () => resolve('');
+    reader.readAsDataURL(file);
+  });
+}
+

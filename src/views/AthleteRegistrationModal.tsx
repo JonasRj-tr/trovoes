@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { db, collection, addDoc, doc, setDoc } from '../lib/firebase';
 import { Player, Guardian, Position, DominantFoot, Category } from '../types';
-import { calculateCategory, calculateAge } from '../lib/utils';
+import { calculateCategory, calculateAge, compressImage } from '../lib/utils';
 import { SignatureCanvas } from '../components/SignatureCanvas';
 
 interface AthleteRegistrationModalProps {
@@ -72,6 +72,7 @@ export const AthleteRegistrationModal: React.FC<AthleteRegistrationModalProps> =
   // Dynamic calculated age & category
   const age = birthDate ? calculateAge(birthDate) : 0;
   const computedCategory = birthDate ? calculateCategory(birthDate) : 'Sub 15';
+  const isAdult = age >= 18;
 
   const handleAddGuardian = () => {
     setGuardians([
@@ -91,19 +92,17 @@ export const AthleteRegistrationModal: React.FC<AthleteRegistrationModalProps> =
     );
   };
 
-  // Convert File to Base64 preview image
-  const handleFileConvert = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
+  // Convert File to Lightweight Compressed Base64 Image
+  const handleFileConvert = async (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 3 * 1024 * 1024) {
-        alert('Por favor, selecione uma imagem de até 3MB.');
-        return;
+      try {
+        const compressedBase64 = await compressImage(file, 750, 0.55);
+        setter(compressedBase64);
+      } catch (err) {
+        console.error('Error compressing image:', err);
+        alert('Erro ao processar imagem. Tente outra foto.');
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setter(reader.result as string);
-      };
-      reader.readAsDataURL(file);
     }
   };
 
@@ -116,20 +115,33 @@ export const AthleteRegistrationModal: React.FC<AthleteRegistrationModalProps> =
       return;
     }
 
-    if (!authorized) {
-      setError('É necessário aceitar a Autorização Legal do Responsável.');
-      return;
-    }
+    // Validation for MINORS (< 18 years)
+    if (!isAdult) {
+      if (!authorized) {
+        setError('É necessário aceitar a Autorização Legal do Responsável para menor de idade.');
+        return;
+      }
 
-    if (guardians.some(g => !g.name.trim() || !g.phone.trim())) {
-      setError('Preencha o nome e telefone de pelo menos um responsável legal.');
-      return;
+      if (guardians.some(g => !g.name.trim() || !g.phone.trim())) {
+        setError('Preencha o nome e telefone de pelo menos um responsável legal.');
+        return;
+      }
+    } else {
+      // Validation for ADULTS (>= 18 years)
+      if (!docPhotoUrl) {
+        setError('Como atleta maior de 18 anos, por favor anexe a foto do seu documento de identidade (RG ou CPF) na Seção 5.');
+        return;
+      }
     }
 
     setLoading(true);
 
     try {
       const pRef = doc(collection(db, 'players'));
+      const activeGuardians = isAdult 
+        ? guardians.filter(g => g.name.trim().length > 0)
+        : guardians;
+
       const newPlayer: Player = {
         id: pRef.id,
         fullName: fullName.trim(),
@@ -147,8 +159,14 @@ export const AthleteRegistrationModal: React.FC<AthleteRegistrationModalProps> =
         photoUrl: photoUrl || 'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=400&auto=format&fit=crop&q=80',
         docPhotoUrl,
         proofAddressUrl,
-        guardians,
-        minorAuthorization: {
+        guardians: activeGuardians,
+        minorAuthorization: isAdult ? {
+          authorized: true,
+          legalText: 'Atleta Maior de Idade (18+ anos) - Autorização do responsável legal dispensada.',
+          signatureDataUrl: '',
+          date: new Date().toISOString().split('T')[0],
+          guardianCpf: ''
+        } : {
           authorized: true,
           legalText,
           signatureDataUrl: signatureData,
@@ -158,6 +176,16 @@ export const AthleteRegistrationModal: React.FC<AthleteRegistrationModalProps> =
         status: isAdminAutoApprove ? 'Aprovado' : 'Pendente',
         createdAt: new Date().toISOString()
       };
+
+      // Payload size safety guard before Firestore save
+      const docPayload = JSON.stringify(newPlayer);
+      const byteSize = new Blob([docPayload]).size;
+
+      if (byteSize > 950000) {
+        setError('O tamanho acumulado das imagens é muito grande para o banco de dados. Por favor, reenvie fotos mais nítidas e menores.');
+        setLoading(false);
+        return;
+      }
 
       await setDoc(pRef, newPlayer);
       alert('Ficha de inscrição enviada com sucesso! O cadastro do atleta foi salvo no sistema TROVOES.');
@@ -215,8 +243,16 @@ export const AthleteRegistrationModal: React.FC<AthleteRegistrationModalProps> =
                   <User className="w-4 h-4" /> 1. Dados do Atleta
                 </span>
                 {birthDate && (
-                  <span className="bg-amber-400/20 text-amber-300 text-xs font-bold px-2.5 py-1 rounded-full border border-amber-400/30 flex items-center gap-1">
-                    <Sparkles className="w-3 h-3" /> Categoria Calculada: {computedCategory} ({age} anos)
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full border flex items-center gap-1 ${
+                    isAdult 
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' 
+                      : 'bg-amber-400/20 text-amber-300 border-amber-400/30'
+                  }`}>
+                    <Sparkles className="w-3 h-3" /> 
+                    {isAdult 
+                      ? `Maior de Idade (${age} anos • ${computedCategory})`
+                      : `Menor de Idade • Categoria ${computedCategory} (${age} anos)`
+                    }
                   </span>
                 )}
               </div>
@@ -369,123 +405,147 @@ export const AthleteRegistrationModal: React.FC<AthleteRegistrationModalProps> =
             <div className="space-y-4 bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
               <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                 <span className="font-bold text-amber-400 text-sm flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4" /> 3. Pais / Responsáveis Legais
+                  <ShieldCheck className="w-4 h-4" /> 3. Pais / Responsáveis Legais {isAdult ? '(Opcional para Maiores de 18 anos)' : '*'}
                 </span>
-                <button
-                  type="button"
-                  onClick={handleAddGuardian}
-                  className="flex items-center gap-1 bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 text-xs font-bold px-2.5 py-1 rounded-lg border border-amber-400/40 transition"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Adicionar Responsável
-                </button>
+                {!isAdult && (
+                  <button
+                    type="button"
+                    onClick={handleAddGuardian}
+                    className="flex items-center gap-1 bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 text-xs font-bold px-2.5 py-1 rounded-lg border border-amber-400/40 transition"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Adicionar Responsável
+                  </button>
+                )}
               </div>
 
-              {guardians.map((g, idx) => (
-                <div key={g.id} className="p-3 bg-slate-950/80 rounded-xl border border-slate-800 space-y-3 relative">
-                  <div className="flex items-center justify-between font-bold text-slate-300 text-[11px]">
-                    <span>Responsável #{idx + 1}</span>
-                    {guardians.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveGuardian(g.id)}
-                        className="text-red-400 hover:text-red-300 p-1"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-slate-400 text-[10px] mb-0.5">Nome Completo *</label>
-                      <input
-                        type="text"
-                        required
-                        value={g.name}
-                        onChange={(e) => handleGuardianChange(g.id, 'name', e.target.value)}
-                        placeholder="Nome do pai/mãe/responsável"
-                        className="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-amber-400"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-slate-400 text-[10px] mb-0.5">Parentesco</label>
-                      <select
-                        value={g.relationship}
-                        onChange={(e) => handleGuardianChange(g.id, 'relationship', e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-amber-400"
-                      >
-                        <option value="Mãe">Mãe</option>
-                        <option value="Pai">Pai</option>
-                        <option value="Avô/Avó">Avô / Avó</option>
-                        <option value="Tutor Legal">Tutor Legal</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-slate-400 text-[10px] mb-0.5">CPF do Responsável</label>
-                      <input
-                        type="text"
-                        value={g.cpf}
-                        onChange={(e) => handleGuardianChange(g.id, 'cpf', e.target.value)}
-                        placeholder="000.000.000-00"
-                        className="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-amber-400"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-slate-400 text-[10px] mb-0.5">Telefone / WhatsApp *</label>
-                      <input
-                        type="text"
-                        required
-                        value={g.phone}
-                        onChange={(e) => handleGuardianChange(g.id, 'phone', e.target.value)}
-                        placeholder="(11) 90000-0000"
-                        className="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-amber-400"
-                      />
-                    </div>
-                  </div>
+              {isAdult ? (
+                <div className="p-3 bg-slate-950/60 border border-slate-800 rounded-xl text-slate-400 text-xs leading-relaxed">
+                  <span className="text-emerald-400 font-bold block mb-0.5">✓ Atleta Maior de Idade ({age} anos)</span>
+                  O preenchimento de responsável legal é opcional para atletas maiores de 18 anos.
                 </div>
-              ))}
+              ) : (
+                guardians.map((g, idx) => (
+                  <div key={g.id} className="p-3 bg-slate-950/80 rounded-xl border border-slate-800 space-y-3 relative">
+                    <div className="flex items-center justify-between font-bold text-slate-300 text-[11px]">
+                      <span>Responsável #{idx + 1}</span>
+                      {guardians.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveGuardian(g.id)}
+                          className="text-red-400 hover:text-red-300 p-1"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-slate-400 text-[10px] mb-0.5">Nome Completo *</label>
+                        <input
+                          type="text"
+                          required={!isAdult}
+                          value={g.name}
+                          onChange={(e) => handleGuardianChange(g.id, 'name', e.target.value)}
+                          placeholder="Nome do pai/mãe/responsável"
+                          className="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-amber-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-400 text-[10px] mb-0.5">Parentesco</label>
+                        <select
+                          value={g.relationship}
+                          onChange={(e) => handleGuardianChange(g.id, 'relationship', e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-amber-400"
+                        >
+                          <option value="Mãe">Mãe</option>
+                          <option value="Pai">Pai</option>
+                          <option value="Avô/Avó">Avô / Avó</option>
+                          <option value="Tutor Legal">Tutor Legal</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-400 text-[10px] mb-0.5">CPF do Responsável</label>
+                        <input
+                          type="text"
+                          value={g.cpf}
+                          onChange={(e) => handleGuardianChange(g.id, 'cpf', e.target.value)}
+                          placeholder="000.000.000-00"
+                          className="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-amber-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-400 text-[10px] mb-0.5">Telefone / WhatsApp *</label>
+                        <input
+                          type="text"
+                          required={!isAdult}
+                          value={g.phone}
+                          onChange={(e) => handleGuardianChange(g.id, 'phone', e.target.value)}
+                          placeholder="(11) 90000-0000"
+                          className="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-amber-400"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
 
             {/* SECTION 4: Termo Legal e Assinatura Digital */}
-            <div className="space-y-3 bg-amber-500/10 p-4 rounded-2xl border border-amber-500/30">
-              <span className="font-bold text-amber-400 text-sm flex items-center gap-2">
-                <FileText className="w-4 h-4" /> 4. Autorização para Menores (Termo Legal Obrigatório)
-              </span>
-
-              <div className="p-3 bg-black/40 rounded-xl border border-amber-500/20 leading-relaxed text-slate-300 font-medium">
-                "{legalText}"
-              </div>
-
-              <div className="flex items-start gap-2 pt-1">
-                <input
-                  type="checkbox"
-                  id="legalAgree"
-                  checked={authorized}
-                  onChange={(e) => setAuthorized(e.target.checked)}
-                  className="mt-1 w-4 h-4 accent-amber-400 rounded cursor-pointer"
-                />
-                <label htmlFor="legalAgree" className="text-slate-200 font-semibold cursor-pointer">
-                  Eu, responsável legal pelo atleta, li, compreendi e concordo integralmente com os termos da autorização acima.
-                </label>
-              </div>
-
-              {authorized && (
-                <div className="pt-2">
-                  <SignatureCanvas
-                    value={signatureData}
-                    onSave={(data) => setSignatureData(data)}
-                  />
+            {isAdult ? (
+              <div className="space-y-2 bg-emerald-500/10 p-4 rounded-2xl border border-emerald-500/30">
+                <span className="font-bold text-emerald-400 text-sm flex items-center gap-2">
+                  <Check className="w-4 h-4 stroke-[3]" /> 4. Autorização do Responsável: Dispensada (Atleta Maior de 18 Anos)
+                </span>
+                <p className="text-slate-300 text-xs leading-relaxed">
+                  Você informou ter <strong>{age} anos</strong>. Como atleta maior de idade, a autorização de responsável legal não é necessária.
+                </p>
+                <div className="p-2.5 bg-emerald-950/40 border border-emerald-500/20 rounded-xl text-emerald-200 text-xs font-semibold flex items-center gap-2">
+                  <FileUp className="w-4 h-4 shrink-0 text-emerald-400" />
+                  <span>Basta anexar a foto do seu documento com foto (RG/CPF) na Seção 5 abaixo.</span>
                 </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="space-y-3 bg-amber-500/10 p-4 rounded-2xl border border-amber-500/30">
+                <span className="font-bold text-amber-400 text-sm flex items-center gap-2">
+                  <FileText className="w-4 h-4" /> 4. Autorização para Menores (Termo Legal Obrigatório)
+                </span>
+
+                <div className="p-3 bg-black/40 rounded-xl border border-amber-500/20 leading-relaxed text-slate-300 font-medium">
+                  "{legalText}"
+                </div>
+
+                <div className="flex items-start gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id="legalAgree"
+                    checked={authorized}
+                    onChange={(e) => setAuthorized(e.target.checked)}
+                    className="mt-1 w-4 h-4 accent-amber-400 rounded cursor-pointer"
+                  />
+                  <label htmlFor="legalAgree" className="text-slate-200 font-semibold cursor-pointer">
+                    Eu, responsável legal pelo atleta, li, compreendi e concordo integralmente com os termos da autorização acima.
+                  </label>
+                </div>
+
+                {authorized && (
+                  <div className="pt-2">
+                    <SignatureCanvas
+                      value={signatureData}
+                      onSave={(data) => setSignatureData(data)}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* SECTION 5: Upload de Fotos / Documentos */}
             <div className="space-y-3 bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
               <span className="font-bold text-amber-400 text-sm flex items-center gap-2">
-                <Upload className="w-4 h-4" /> 5. Fotos e Comprovantes
+                <Upload className="w-4 h-4" /> 5. Fotos e Documento Oficial
               </span>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
