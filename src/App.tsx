@@ -64,14 +64,21 @@ export default function App() {
         try {
           const userSnap = await getDoc(doc(db, 'users', user.uid));
           if (userSnap.exists()) {
-            setCurrentUser(userSnap.data() as UserProfile);
+            const data = userSnap.data() as UserProfile;
+            // Ensure tecnico role if email is tecnico@x.com
+            if (user.email === 'tecnico@x.com' && data.role !== 'tecnico') {
+              data.role = 'tecnico';
+              data.name = 'Técnico TROVOES';
+            }
+            setCurrentUser(data);
           } else {
             const isAdmin = user.email === 'admin@x.com';
+            const isCoach = user.email === 'tecnico@x.com';
             const newProf: UserProfile = {
               uid: user.uid,
               email: user.email || '',
-              name: isAdmin ? 'Administrador TROVOES' : user.displayName || user.email?.split('@')[0] || 'Usuário',
-              role: isAdmin ? 'admin' : 'jogador',
+              name: isAdmin ? 'Administrador TROVOES' : isCoach ? 'Técnico TROVOES' : user.displayName || user.email?.split('@')[0] || 'Usuário',
+              role: isAdmin ? 'admin' : isCoach ? 'tecnico' : 'jogador',
               createdAt: new Date().toISOString()
             };
             setCurrentUser(newProf);
@@ -196,6 +203,8 @@ export default function App() {
   }
 
   const isAdmin = currentUser.role === 'admin';
+  const isCoach = currentUser.role === 'tecnico';
+  const isCoachOrAdmin = isAdmin || isCoach;
 
   return (
     <div className="min-h-screen bg-[#050C16] text-slate-100 flex flex-col selection:bg-[#FFCC00] selection:text-[#0A2540]">
@@ -250,7 +259,7 @@ export default function App() {
               onSelectCategory={setSelectedCategory}
               onOpenNewAthleteModal={() => setShowRegisterModal(true)}
               onSelectPlayer={(p) => setSelectedPlayerForProfile(p)}
-              isAdmin={isAdmin}
+              isAdmin={isCoachOrAdmin}
             />
           )}
 
@@ -259,14 +268,15 @@ export default function App() {
               trainings={trainings}
               players={players}
               locations={locations}
-              isAdmin={isAdmin}
+              isAdmin={isCoachOrAdmin}
+              userRole={currentUser.role}
             />
           )}
 
           {activeTab === 'locations' && (
             <LocationsView
               locations={locations}
-              isAdmin={isAdmin}
+              isAdmin={isCoachOrAdmin}
             />
           )}
 
@@ -275,7 +285,7 @@ export default function App() {
               callups={callups}
               players={players}
               user={currentUser}
-              isAdmin={isAdmin}
+              isAdmin={isCoachOrAdmin}
             />
           )}
 

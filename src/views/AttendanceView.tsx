@@ -16,7 +16,7 @@ import {
   ChevronRight,
   Sparkles
 } from 'lucide-react';
-import { Training, Player, AttendanceRecord, Category, AttendanceStatus } from '../types';
+import { Training, Player, AttendanceRecord, Category, AttendanceStatus, UserRole } from '../types';
 import { formatDateBR, exportToCSV, printReport } from '../lib/utils';
 import { db, collection, addDoc, setDoc, doc, onSnapshot } from '../lib/firebase';
 
@@ -25,13 +25,15 @@ interface AttendanceViewProps {
   players: Player[];
   locations: any[];
   isAdmin: boolean;
+  userRole?: UserRole;
 }
 
 export const AttendanceView: React.FC<AttendanceViewProps> = ({
   trainings,
   players,
   locations,
-  isAdmin
+  isAdmin,
+  userRole
 }) => {
   const [selectedTraining, setSelectedTraining] = useState<Training | null>(trainings[0] || null);
   const [attendanceRecords, setAttendanceRecords] = useState<Record<string, AttendanceRecord>>({});
@@ -199,14 +201,24 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold font-syne text-white flex items-center gap-2">
-            Controle de Presença nos Treinos
-            <span className="bg-emerald-400/20 text-emerald-300 text-xs font-extrabold px-2.5 py-0.5 rounded-full border border-emerald-400/40">
+          <div className="flex items-center gap-2 mb-1">
+            <h1 className="text-2xl font-bold font-syne text-white flex items-center gap-2">
+              Controle de Presença nos Treinos
+            </h1>
+            <span className="bg-emerald-400/20 text-emerald-300 text-xs font-extrabold px-2.5 py-0.5 rounded-full border border-emerald-400/40 shrink-0">
               {attendancePercentage}% Frequência
             </span>
-          </h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Registro instantâneo de presença por categoria com exportação de relatórios.
+          </div>
+
+          {userRole === 'tecnico' && (
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#FFCC00]/10 border border-[#FFCC00]/30 rounded-xl text-[#FFCC00] text-xs font-black uppercase tracking-wider mb-1">
+              <Zap className="w-3.5 h-3.5 fill-[#FFCC00]" />
+              Painel do Técnico • Marcar Treinos e Acompanhar Presenças
+            </div>
+          )}
+
+          <p className="text-xs text-slate-400">
+            Registro e marcação instantânea de treinos por categoria com acompanhamento de chamadas.
           </p>
         </div>
 
@@ -217,7 +229,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
               className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-lg trovoes-glow-yellow transition flex items-center gap-1.5"
             >
               <Plus className="w-4 h-4 stroke-[3]" />
-              <span>Novo Treino</span>
+              <span>Marcar Treino</span>
             </button>
           )}
 

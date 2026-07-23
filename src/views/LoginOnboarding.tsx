@@ -81,15 +81,69 @@ export const LoginOnboarding: React.FC<LoginOnboardingProps> = ({
     }
   };
 
+  // Direct guaranteed Coach Login handler (tecnico@x.com / tecnico4321)
+  const handleCoachDirectLogin = async () => {
+    setError('');
+    setLoading(true);
+    const coachEmail = 'tecnico@x.com';
+    const coachPass = 'tecnico4321';
+
+    const coachProfile: UserProfile = {
+      uid: 'tecnico_trovoes_uid',
+      email: coachEmail,
+      name: 'Técnico TROVOES',
+      role: 'tecnico',
+      createdAt: new Date().toISOString()
+    };
+
+    try {
+      let u: any = null;
+      try {
+        const cred = await signInWithEmailAndPassword(auth, coachEmail, coachPass);
+        u = cred.user;
+      } catch (err1) {
+        try {
+          const cred = await createUserWithEmailAndPassword(auth, coachEmail, coachPass);
+          u = cred.user;
+        } catch (err2) {
+          u = auth.currentUser;
+        }
+      }
+
+      if (u) {
+        coachProfile.uid = u.uid;
+        try {
+          await setDoc(doc(db, 'users', u.uid), coachProfile, { merge: true });
+        } catch (dbErr) {
+          console.warn('Firestore user update notice:', dbErr);
+        }
+      }
+
+      onLoginSuccess(coachProfile);
+    } catch (err) {
+      console.error('Coach login fallback:', err);
+      onLoginSuccess(coachProfile);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    const isAdminTarget = email.trim().toLowerCase() === 'admin@x.com' || role === 'admin';
+    const isEmailLower = email.trim().toLowerCase();
+    const isAdminTarget = isEmailLower === 'admin@x.com' || role === 'admin';
+    const isCoachTarget = isEmailLower === 'tecnico@x.com' || role === 'tecnico';
 
     if (isAdminTarget) {
       await handleAdminDirectLogin();
+      return;
+    }
+
+    if (isCoachTarget) {
+      await handleCoachDirectLogin();
       return;
     }
 
