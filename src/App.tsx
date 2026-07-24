@@ -42,6 +42,7 @@ export default function App() {
 
   // Modals State
   const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [playerToEdit, setPlayerToEdit] = useState<Player | null>(null);
   const [selectedPlayerForProfile, setSelectedPlayerForProfile] = useState<Player | null>(null);
 
   // PWA Install Prompt
@@ -257,9 +258,16 @@ export default function App() {
               players={players}
               selectedCategory={selectedCategory}
               onSelectCategory={setSelectedCategory}
-              onOpenNewAthleteModal={() => setShowRegisterModal(true)}
+              onOpenNewAthleteModal={() => {
+                setPlayerToEdit(null);
+                setShowRegisterModal(true);
+              }}
               onSelectPlayer={(p) => setSelectedPlayerForProfile(p)}
               isAdmin={isCoachOrAdmin}
+              onEditPlayer={(p) => {
+                setPlayerToEdit(p);
+                setShowRegisterModal(true);
+              }}
             />
           )}
 
@@ -294,6 +302,10 @@ export default function App() {
               players={players}
               announcements={announcements}
               onSelectPlayer={(p) => setSelectedPlayerForProfile(p)}
+              onEditPlayer={(p) => {
+                setPlayerToEdit(p);
+                setShowRegisterModal(true);
+              }}
             />
           )}
         </main>
@@ -305,13 +317,18 @@ export default function App() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         isAdmin={isAdmin}
+        isJogador={currentUser.role === 'jogador'}
         callupsBadgeCount={callups.length}
       />
 
       {/* Athlete Registration Modal */}
       <AthleteRegistrationModal
         isOpen={showRegisterModal}
-        onClose={() => setShowRegisterModal(false)}
+        onClose={() => {
+          setShowRegisterModal(false);
+          setPlayerToEdit(null);
+        }}
+        initialData={playerToEdit}
         isAdminAutoApprove={isAdmin}
       />
 

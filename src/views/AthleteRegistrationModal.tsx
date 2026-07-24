@@ -17,9 +17,11 @@ import {
   Activity,
   Ruler,
   Scale,
-  Sparkles
+  Sparkles,
+  Lock
 } from 'lucide-react';
-import { db, collection, addDoc, doc, setDoc } from '../lib/firebase';
+import { auth, db, collection, addDoc, doc, setDoc } from '../lib/firebase';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { Player, Guardian, Position, DominantFoot, Category } from '../types';
 import { calculateCategory, calculateAge, compressImage } from '../lib/utils';
 import { SignatureCanvas } from '../components/SignatureCanvas';
@@ -29,18 +31,20 @@ interface AthleteRegistrationModalProps {
   onClose: () => void;
   onSuccess?: (player?: Player) => void;
   isAdminAutoApprove?: boolean;
+  initialData?: Player | null;
 }
 
 export const AthleteRegistrationModal: React.FC<AthleteRegistrationModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
-  isAdminAutoApprove = false
+  isAdminAutoApprove = false,
+  initialData
 }) => {
-  if (!isOpen) return null;
-
   // Form State
   const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [rgCpf, setRgCpf] = useState('');
   const [address, setAddress] = useState('');
@@ -68,6 +72,63 @@ export const AthleteRegistrationModal: React.FC<AthleteRegistrationModalProps> =
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Populate data when editing
+  useEffect(() => {
+    if (initialData && isOpen) {
+      setFullName(initialData.fullName || '');
+      setBirthDate(initialData.birthDate || '');
+      setRgCpf(initialData.rgCpf || '');
+      setAddress(initialData.address || '');
+      setPhone(initialData.phone || '');
+      setPosition(initialData.position || 'Atacante');
+      setDominantFoot(initialData.dominantFoot || 'Direito');
+      setHeight(initialData.height || 170);
+      setWeight(initialData.weight || 65);
+      setInjuryHistory(initialData.injuryHistory || '');
+      setPreviousClub(initialData.previousClub || '');
+      setPhotoUrl(initialData.photoUrl || '');
+      setDocPhotoUrl(initialData.docPhotoUrl || '');
+      setProofAddressUrl(initialData.proofAddressUrl || '');
+      
+      if (initialData.guardians && initialData.guardians.length > 0) {
+        setGuardians(initialData.guardians);
+      } else {
+        setGuardians([{ id: '1', name: '', relationship: 'Mãe', cpf: '', phone: '', email: '' }]);
+      }
+
+      if (initialData.minorAuthorization) {
+        setAuthorized(initialData.minorAuthorization.authorized || false);
+        setSignatureData(initialData.minorAuthorization.signatureDataUrl || '');
+        setGuardianCpfAuth(initialData.minorAuthorization.guardianCpf || '');
+      }
+    } else if (isOpen) {
+      // Reset form when opening as new
+      setFullName('');
+      setEmail('');
+      setPassword('');
+      setBirthDate('');
+      setRgCpf('');
+      setAddress('');
+      setPhone('');
+      setPosition('Atacante');
+      setDominantFoot('Direito');
+      setHeight(170);
+      setWeight(65);
+      setInjuryHistory('Nenhuma lesão grave relatada.');
+      setPreviousClub('');
+      setPhotoUrl('');
+      setDocPhotoUrl('');
+      setProofAddressUrl('');
+      setGuardians([{ id: '1', name: '', relationship: 'Mãe', cpf: '', phone: '', email: '' }]);
+      setAuthorized(false);
+      setSignatureData('');
+      setGuardianCpfAuth('');
+      setError('');
+    }
+  }, [initialData, isOpen]);
+
+  if (!isOpen) return null;
 
   // Dynamic calculated age & category
   const age = birthDate ? calculateAge(birthDate) : 0;
@@ -137,7 +198,28 @@ export const AthleteRegistrationModal: React.FC<AthleteRegistrationModalProps> =
     setLoading(true);
 
     try {
-      const pRef = doc(collection(db, 'players'));
+      let uid = initialData ? initialData.id : doc(collection(db, 'players')).id;
+
+      if (!initialData && !isAdminAutoApprove && email && password) {
+        try {
+          const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+          uid = cred.user.uid;
+          
+          await setDoc(doc(db, 'users', uid), {
+            uid: uid,
+            email: email.trim(),
+            name: fullName.trim(),
+            role: 'jogador',
+            createdAt: new Date().toISOString()
+          });
+        } catch (authErr: any) {
+          setError('Erro ao criar conta de acesso: ' + authErr.message);
+          setLoading(false);
+          return;
+        }
+      }
+
+      const pRef = doc(db, 'players', uid);
       const activeGuardians = isAdult 
         ? guardians.filter(g => g.name.trim().length > 0)
         : guardians;
@@ -173,8 +255,8 @@ export const AthleteRegistrationModal: React.FC<AthleteRegistrationModalProps> =
           date: new Date().toISOString().split('T')[0],
           guardianCpf: guardianCpfAuth || guardians[0]?.cpf || ''
         },
-        status: isAdminAutoApprove ? 'Aprovado' : 'Pendente',
-        createdAt: new Date().toISOString()
+        status: initialData ? initialData.status : (isAdminAutoApprove ? 'Aprovado' : 'Pendente'),
+        createdAt: initialData ? initialData.createdAt : new Date().toISOString()
       };
 
       // Payload size safety guard before Firestore save
@@ -188,7 +270,7 @@ export const AthleteRegistrationModal: React.FC<AthleteRegistrationModalProps> =
       }
 
       await setDoc(pRef, newPlayer);
-      alert('Ficha de inscrição enviada com sucesso! O cadastro do atleta foi salvo no sistema TROVOES.');
+      alert(initialData ? 'Atleta atualizado com sucesso!' : 'Ficha de inscrição enviada com sucesso! O cadastro do atleta foi salvo no sistema TROVOES.');
       if (onSuccess) onSuccess(newPlayer);
       onClose();
     } catch (err: any) {
@@ -236,6 +318,45 @@ export const AthleteRegistrationModal: React.FC<AthleteRegistrationModalProps> =
 
           <form id="athleteForm" onSubmit={handleSubmit} className="space-y-6">
             
+            {/* SECTION 0: Acesso (Only for Self Registration) */}
+            {!isAdminAutoApprove && !initialData && (
+              <div className="space-y-4 bg-amber-500/10 p-4 rounded-2xl border border-amber-500/30">
+                <div className="flex items-center justify-between border-b border-amber-500/20 pb-2">
+                  <span className="font-bold text-amber-400 text-sm flex items-center gap-2">
+                    <Lock className="w-4 h-4" /> 0. Criar Acesso ao Painel
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block text-amber-200/80 text-[10px] uppercase font-bold mb-1">Email de Acesso *</label>
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="seu.email@exemplo.com"
+                      className="w-full bg-slate-900 border border-amber-500/30 rounded-xl px-3 py-2.5 text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400 transition shadow-inner"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-amber-200/80 text-[10px] uppercase font-bold mb-1">Senha (Mín. 6 caracteres) *</label>
+                    <input
+                      type="password"
+                      required
+                      minLength={6}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="******"
+                      className="w-full bg-slate-900 border border-amber-500/30 rounded-xl px-3 py-2.5 text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400 transition shadow-inner"
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-amber-200/60 font-medium pt-1">
+                  Estes dados serão usados para você acessar o painel exclusivo do atleta TROVOES.
+                </p>
+              </div>
+            )}
+
             {/* SECTION 1: Dados Pessoais do Atleta */}
             <div className="space-y-4 bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
               <div className="flex items-center justify-between border-b border-slate-800 pb-2">

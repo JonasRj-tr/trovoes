@@ -94,47 +94,93 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         
-        {/* Total Atletas */}
-        <div 
-          onClick={() => onNavigate('roster')}
-          className="trovoes-card p-4 rounded-2xl hover:border-[#FFCC00]/50 transition cursor-pointer group"
-        >
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Atletas</span>
-            <div className="p-2 rounded-xl bg-[#FFCC00]/10 text-[#FFCC00] group-hover:scale-110 transition">
-              <Users className="w-4 h-4" />
+        {user?.role === 'jogador' ? (
+          <>
+            <div 
+              className="trovoes-card p-4 rounded-2xl hover:border-[#FFCC00]/50 transition cursor-pointer group"
+              onClick={() => {
+                const myPlayer = players.find(p => p.fullName.toLowerCase() === user.name.toLowerCase());
+                if (myPlayer) onSelectPlayer(myPlayer);
+              }}
+            >
+              <div className="flex items-center justify-between text-slate-400 mb-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Minha Ficha</span>
+                <div className="p-2 rounded-xl bg-[#FFCC00]/10 text-[#FFCC00] group-hover:scale-110 transition">
+                  <UserPlus className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-sm font-black font-syne text-white truncate max-w-full">
+                  {user.name}
+                </span>
+              </div>
+              <p className="text-[10px] text-[#FFCC00] mt-2 font-medium">Ver detalhes da minha inscrição</p>
             </div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black font-syne text-white">{totalApproved}</span>
-            <span className="text-[10px] text-emerald-400 font-extrabold bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/30 uppercase">
-              Aprovados
-            </span>
-          </div>
-          <p className="text-[10px] text-slate-400 mt-2 truncate font-medium">
-            Sub 14: {sub14Count} | Sub 15: {sub15Count} | Sub 17: {sub17Count} | Sub 20: {sub20Count}
-          </p>
-        </div>
 
-        {/* Presença Média */}
-        <div 
-          onClick={() => onNavigate('trainings')}
-          className="trovoes-card p-4 rounded-2xl hover:border-[#FFCC00]/50 transition cursor-pointer group"
-        >
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Presença Média</span>
-            <div className="p-2 rounded-xl bg-emerald-400/10 text-emerald-400 group-hover:scale-110 transition">
-              <TrendingUp className="w-4 h-4" />
+            <div 
+              className="trovoes-card p-4 rounded-2xl hover:border-[#FFCC00]/50 transition cursor-pointer group"
+              onClick={() => onNavigate('trainings')}
+            >
+              <div className="flex items-center justify-between text-slate-400 mb-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Minha Presença</span>
+                <div className="p-2 rounded-xl bg-emerald-400/10 text-emerald-400 group-hover:scale-110 transition">
+                  <TrendingUp className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-black font-syne text-emerald-400">92%</span>
+                <span className="text-[10px] text-emerald-400 font-extrabold">Frequência</span>
+              </div>
+              <p className="text-[10px] text-slate-400 mt-2 font-medium">
+                Comparecimento aos treinos
+              </p>
             </div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black font-syne text-emerald-400">92%</span>
-            <span className="text-[10px] text-emerald-400 font-extrabold">↑ +4% mês</span>
-          </div>
-          <p className="text-[10px] text-slate-400 mt-2 font-medium">
-            Excelente presença nos treinos
-          </p>
-        </div>
+          </>
+        ) : (
+          <>
+            {/* Total Atletas */}
+            <div 
+              onClick={() => onNavigate('roster')}
+              className="trovoes-card p-4 rounded-2xl hover:border-[#FFCC00]/50 transition cursor-pointer group"
+            >
+              <div className="flex items-center justify-between text-slate-400 mb-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Atletas</span>
+                <div className="p-2 rounded-xl bg-[#FFCC00]/10 text-[#FFCC00] group-hover:scale-110 transition">
+                  <Users className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-black font-syne text-white">{totalApproved}</span>
+                <span className="text-[10px] text-emerald-400 font-extrabold bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/30 uppercase">
+                  Aprovados
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400 mt-2 truncate font-medium">
+                Sub 14: {sub14Count} | Sub 15: {sub15Count} | Sub 17: {sub17Count} | Sub 20: {sub20Count}
+              </p>
+            </div>
+
+            {/* Presença Média */}
+            <div 
+              onClick={() => onNavigate('trainings')}
+              className="trovoes-card p-4 rounded-2xl hover:border-[#FFCC00]/50 transition cursor-pointer group"
+            >
+              <div className="flex items-center justify-between text-slate-400 mb-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Presença Média</span>
+                <div className="p-2 rounded-xl bg-emerald-400/10 text-emerald-400 group-hover:scale-110 transition">
+                  <TrendingUp className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-black font-syne text-emerald-400">92%</span>
+                <span className="text-[10px] text-emerald-400 font-extrabold">↑ +4% mês</span>
+              </div>
+              <p className="text-[10px] text-slate-400 mt-2 font-medium">
+                Excelente presença nos treinos
+              </p>
+            </div>
+          </>
+        )}
 
         {/* Treinos Agendados */}
         <div 

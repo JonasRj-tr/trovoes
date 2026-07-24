@@ -33,7 +33,6 @@ export const LoginOnboarding: React.FC<LoginOnboardingProps> = ({
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Direct guaranteed Admin Login handler
   const handleAdminDirectLogin = async () => {
     setError('');
     setLoading(true);
@@ -203,36 +202,6 @@ export const LoginOnboarding: React.FC<LoginOnboardingProps> = ({
       } else {
         setError(err.message || 'Erro ao autenticar. Verifique seus dados.');
       }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    setError('');
-    setLoading(true);
-    try {
-      const res = await signInWithPopup(auth, googleProvider);
-      const u = res.user;
-      const uSnap = await getDoc(doc(db, 'users', u.uid));
-      let profile: UserProfile;
-
-      if (uSnap.exists()) {
-        profile = uSnap.data() as UserProfile;
-      } else {
-        profile = {
-          uid: u.uid,
-          email: u.email || '',
-          name: u.displayName || 'Usuário Google',
-          role: 'jogador',
-          createdAt: new Date().toISOString()
-        };
-        await setDoc(doc(db, 'users', u.uid), profile);
-      }
-      onLoginSuccess(profile);
-    } catch (err: any) {
-      console.error(err);
-      setError('Não foi possível entrar com Google.');
     } finally {
       setLoading(false);
     }

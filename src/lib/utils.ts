@@ -116,7 +116,7 @@ export function printReport(title: string, htmlContent: string) {
  * Compresses and resizes image file to lightweight Base64 string
  * to prevent Firestore document size limit errors (1MB max per doc).
  */
-export function compressImage(file: File, maxWidth = 750, quality = 0.55): Promise<string> {
+export function compressImage(file: File, maxWidth = 500, quality = 0.4): Promise<string> {
   return new Promise((resolve) => {
     if (!file || !file.type.startsWith('image/')) {
       const reader = new FileReader();

@@ -14,6 +14,7 @@ interface BottomNavProps {
   activeTab: TabType;
   onTabChange: (tab: TabType) => void;
   isAdmin: boolean;
+  isJogador?: boolean;
   callupsBadgeCount?: number;
 }
 
@@ -21,15 +22,19 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   activeTab,
   onTabChange,
   isAdmin,
+  isJogador = false,
   callupsBadgeCount = 0,
 }) => {
   const tabs = [
     { id: 'home' as TabType, label: 'Início', icon: Home },
     { id: 'trainings' as TabType, label: 'Treinos', icon: Activity },
     { id: 'callups' as TabType, label: 'Convocação', icon: Award, badge: callupsBadgeCount },
-    { id: 'roster' as TabType, label: 'Atletas', icon: Users },
     { id: 'locations' as TabType, label: 'Locais', icon: MapPin },
   ];
+
+  if (!isJogador) {
+    tabs.splice(3, 0, { id: 'roster' as TabType, label: 'Atletas', icon: Users });
+  }
 
   if (isAdmin) {
     tabs.push({ id: 'admin' as TabType, label: 'Admin', icon: ShieldCheck });

@@ -15,7 +15,8 @@ import {
   Scale, 
   ShieldCheck, 
   ShieldAlert,
-  Sparkles
+  Sparkles,
+  Trash2
 } from 'lucide-react';
 import { Player, Category, RegistrationStatus } from '../types';
 import { calculateAge, formatDateBR } from '../lib/utils';
@@ -28,6 +29,7 @@ interface RosterViewProps {
   onOpenNewAthleteModal: () => void;
   onSelectPlayer: (player: Player) => void;
   isAdmin: boolean;
+  onEditPlayer?: (player: Player) => void;
 }
 
 export const RosterView: React.FC<RosterViewProps> = ({
@@ -36,11 +38,24 @@ export const RosterView: React.FC<RosterViewProps> = ({
   onSelectCategory,
   onOpenNewAthleteModal,
   onSelectPlayer,
-  isAdmin
+  isAdmin,
+  onEditPlayer
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'Todos' | RegistrationStatus>('Todos');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+
+  const handleDeletePlayer = async (playerId: string, playerName: string) => {
+    if (window.confirm(`Tem certeza que deseja excluir permanentemente o atleta ${playerName}?`)) {
+      try {
+        await deleteDoc(doc(db, 'players', playerId));
+        alert('Atleta excluído com sucesso.');
+      } catch (error) {
+        console.error("Error deleting player: ", error);
+        alert('Erro ao excluir atleta.');
+      }
+    }
+  };
 
   const categories: string[] = ['Todas', 'Sub 14', 'Sub 15', 'Sub 17', 'Sub 20'];
 
@@ -61,16 +76,6 @@ export const RosterView: React.FC<RosterViewProps> = ({
       await updateDoc(doc(db, 'players', playerId), { status: newStatus });
     } catch (err) {
       console.error('Error updating player status:', err);
-    }
-  };
-
-  const handleDeletePlayer = async (playerId: string) => {
-    if (window.confirm('Tem certeza que deseja excluir a ficha deste atleta?')) {
-      try {
-        await deleteDoc(doc(db, 'players', playerId));
-      } catch (err) {
-        console.error('Error deleting player:', err);
-      }
     }
   };
 
@@ -269,6 +274,23 @@ export const RosterView: React.FC<RosterViewProps> = ({
                     <span>Ver Ficha Completa</span>
                   </button>
 
+                  {isAdmin && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => onEditPlayer && onEditPlayer(player)}
+                        className="py-1.5 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-white font-bold text-[11px] rounded-lg transition flex items-center justify-center gap-1"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => handleDeletePlayer(player.id, player.fullName)}
+                        className="py-1.5 bg-red-950/40 border border-red-900/50 hover:bg-red-900/40 text-red-400 font-bold text-[11px] rounded-lg transition flex items-center justify-center gap-1"
+                      >
+                        Excluir
+                      </button>
+                    </div>
+                  )}
+
                   {isAdmin && player.status === 'Pendente' && (
                     <div className="grid grid-cols-2 gap-2">
                       <button
@@ -346,12 +368,33 @@ export const RosterView: React.FC<RosterViewProps> = ({
                       </span>
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <button
-                        onClick={() => onSelectPlayer(p)}
-                        className="bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 font-bold px-2.5 py-1 rounded-lg transition"
-                      >
-                        Ficha
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => onSelectPlayer(p)}
+                          className="bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 font-bold px-2.5 py-1 rounded-lg transition"
+                          title="Ficha"
+                        >
+                          Ficha
+                        </button>
+                        {isAdmin && (
+                          <>
+                            <button
+                              onClick={() => onEditPlayer && onEditPlayer(p)}
+                              className="bg-slate-800 hover:bg-slate-700 text-white font-bold px-2.5 py-1 rounded-lg transition"
+                              title="Editar"
+                            >
+                              Editar
+                            </button>
+                            <button
+                              onClick={() => handleDeletePlayer(p.id, p.fullName)}
+                              className="bg-red-950/40 hover:bg-red-900/40 text-red-400 font-bold px-2.5 py-1 rounded-lg transition"
+                              title="Excluir"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

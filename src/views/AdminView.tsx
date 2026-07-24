@@ -20,15 +20,17 @@ interface AdminViewProps {
   players: Player[];
   announcements: Announcement[];
   onSelectPlayer: (p: Player) => void;
+  onEditPlayer?: (p: Player) => void;
 }
 
 export const AdminView: React.FC<AdminViewProps> = ({
   players,
   announcements,
-  onSelectPlayer
+  onSelectPlayer,
+  onEditPlayer
 }) => {
   const [users, setUsers] = useState<UserProfile[]>([]);
-  const [activeSubTab, setActiveSubTab] = useState<'pending' | 'users' | 'announcements'>('pending');
+  const [activeSubTab, setActiveSubTab] = useState<'pending' | 'athletes' | 'users' | 'announcements'>('pending');
 
   // Announcement Form
   const [annTitle, setAnnTitle] = useState('');
@@ -46,6 +48,19 @@ export const AdminView: React.FC<AdminViewProps> = ({
   }, []);
 
   const pendingPlayers = players.filter(p => p.status === 'Pendente');
+  const approvedPlayers = players.filter(p => p.status === 'Aprovado');
+
+  const handleDeletePlayer = async (playerId: string, playerName: string) => {
+    if (window.confirm(`Tem certeza que deseja excluir permanentemente o atleta ${playerName}?`)) {
+      try {
+        await deleteDoc(doc(db, 'players', playerId));
+        alert('Atleta excluído com sucesso.');
+      } catch (error) {
+        console.error("Error deleting player: ", error);
+        alert('Erro ao excluir atleta.');
+      }
+    }
+  };
 
   const handleUpdatePlayerStatus = async (playerId: string, newStatus: 'Aprovado' | 'Recusado') => {
     try {
@@ -143,34 +158,46 @@ export const AdminView: React.FC<AdminViewProps> = ({
       </div>
 
       {/* Sub Tabs */}
-      <div className="flex items-center gap-2 bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800 text-xs font-bold">
+      <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800 text-xs font-bold">
         <button
           onClick={() => setActiveSubTab('pending')}
-          className={`flex-1 py-2 rounded-xl transition flex items-center justify-center gap-1.5 ${
+          className={`flex-1 py-2 px-2 rounded-xl transition flex items-center justify-center gap-1.5 ${
             activeSubTab === 'pending'
               ? 'bg-amber-400 text-black shadow-lg trovoes-glow-yellow'
               : 'text-slate-400 hover:text-white'
           }`}
         >
           <UserCheck className="w-4 h-4" />
-          <span>Fichas Pendentes ({pendingPlayers.length})</span>
+          <span>Pendentes ({pendingPlayers.length})</span>
         </button>
 
         <button
-          onClick={() => setActiveSubTab('users')}
-          className={`flex-1 py-2 rounded-xl transition flex items-center justify-center gap-1.5 ${
-            activeSubTab === 'users'
+          onClick={() => setActiveSubTab('athletes')}
+          className={`flex-1 py-2 px-2 rounded-xl transition flex items-center justify-center gap-1.5 ${
+            activeSubTab === 'athletes'
               ? 'bg-amber-400 text-black shadow-lg trovoes-glow-yellow'
               : 'text-slate-400 hover:text-white'
           }`}
         >
           <Users className="w-4 h-4" />
+          <span>Atletas ({approvedPlayers.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('users')}
+          className={`flex-1 py-2 px-2 rounded-xl transition flex items-center justify-center gap-1.5 ${
+            activeSubTab === 'users'
+              ? 'bg-amber-400 text-black shadow-lg trovoes-glow-yellow'
+              : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <Settings className="w-4 h-4" />
           <span>Usuários ({users.length})</span>
         </button>
 
         <button
           onClick={() => setActiveSubTab('announcements')}
-          className={`flex-1 py-2 rounded-xl transition flex items-center justify-center gap-1.5 ${
+          className={`flex-1 py-2 px-2 rounded-xl transition flex items-center justify-center gap-1.5 ${
             activeSubTab === 'announcements'
               ? 'bg-amber-400 text-black shadow-lg trovoes-glow-yellow'
               : 'text-slate-400 hover:text-white'
@@ -238,6 +265,57 @@ export const AdminView: React.FC<AdminViewProps> = ({
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SUB TAB: Atletas Aprovados */}
+      {activeSubTab === 'athletes' && (
+        <div className="space-y-4">
+          {approvedPlayers.length === 0 ? (
+            <div className="trovoes-card p-12 text-center rounded-3xl border border-slate-800 space-y-2">
+              <Users className="w-12 h-12 text-slate-500 mx-auto" />
+              <h3 className="font-bold text-slate-200">Nenhum atleta aprovado</h3>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-300 bg-slate-900 rounded-xl overflow-hidden">
+                <thead className="bg-slate-800 text-slate-400 uppercase font-bold text-[10px]">
+                  <tr>
+                    <th className="py-3 px-4">Nome</th>
+                    <th className="py-3 px-4">Categoria</th>
+                    <th className="py-3 px-4">Posição</th>
+                    <th className="py-3 px-4 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {approvedPlayers.map((player) => (
+                    <tr key={player.id} className="hover:bg-slate-800/50">
+                      <td className="py-3 px-4 font-bold text-white flex items-center gap-2">
+                        <img src={player.photoUrl} alt={player.fullName} className="w-6 h-6 rounded-full object-cover" />
+                        {player.fullName}
+                      </td>
+                      <td className="py-3 px-4 text-amber-400">{player.category}</td>
+                      <td className="py-3 px-4 text-slate-400">{player.position}</td>
+                      <td className="py-3 px-4 text-right space-x-2">
+                        <button
+                          onClick={() => onEditPlayer && onEditPlayer(player)}
+                          className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-[10px] font-bold"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDeletePlayer(player.id, player.fullName)}
+                          className="px-2 py-1 bg-red-950/50 hover:bg-red-900 text-red-400 rounded text-[10px] font-bold"
+                        >
+                          Excluir
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

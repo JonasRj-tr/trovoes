@@ -32,14 +32,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectCategory
 }) => {
   const isAdmin = user?.role === 'admin';
+  const isJogador = user?.role === 'jogador';
 
   const navItems = [
     { id: 'home' as TabType, label: 'Dashboard Início', icon: Home },
     { id: 'trainings' as TabType, label: 'Treinos e Presença', icon: Activity },
     { id: 'callups' as TabType, label: 'Lista de Convocação', icon: Award },
-    { id: 'roster' as TabType, label: 'Atletas / Turmas', icon: Users },
     { id: 'locations' as TabType, label: 'Locais de Treino', icon: MapPin },
   ];
+
+  if (!isJogador) {
+    navItems.splice(3, 0, { id: 'roster' as TabType, label: 'Atletas / Turmas', icon: Users });
+  }
 
   if (isAdmin) {
     navItems.push({ id: 'admin' as TabType, label: 'Painel do Administrador', icon: ShieldCheck });
@@ -51,15 +55,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <aside className="hidden sm:flex flex-col w-64 bg-[#0D1B2A] border-r border-[#1B2A41] p-4 shrink-0 min-h-[calc(100vh-65px)]">
       
       {/* Quick Action Button */}
-      <div className="mb-6">
-        <button
-          onClick={onOpenNewAthleteModal}
-          className="w-full flex items-center justify-center gap-2 bg-[#FFCC00] hover:bg-[#ffe066] text-[#0A2540] font-black uppercase text-xs tracking-wider py-3 px-4 rounded-xl shadow-lg shadow-[#FFCC00]/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
-        >
-          <UserPlus className="w-4 h-4 stroke-[2.5]" />
-          <span>Cadastrar Atleta</span>
-        </button>
-      </div>
+      {!isJogador && (
+        <div className="mb-6">
+          <button
+            onClick={onOpenNewAthleteModal}
+            className="w-full flex items-center justify-center gap-2 bg-[#FFCC00] hover:bg-[#ffe066] text-[#0A2540] font-black uppercase text-xs tracking-wider py-3 px-4 rounded-xl shadow-lg shadow-[#FFCC00]/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <UserPlus className="w-4 h-4 stroke-[2.5]" />
+            <span>Cadastrar Atleta</span>
+          </button>
+        </div>
+      )}
 
       {/* Main Nav Links */}
       <div className="space-y-1 mb-6">
